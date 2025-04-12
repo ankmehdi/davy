@@ -1,0 +1,116 @@
+// App.js (React component)
+import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import io from 'socket.io-client';
+import L from 'leaflet';
+
+// Fix for marker icon issue
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
+  iconUrl: require('leaflet/dist/images/marker-icon.png'),
+  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+});
+
+const socket = io('http://localhost:3001'); // Replace with your server URL
+
+function App() {
+  const [userId, setUserId] = useState(null);
+  const [username, setUsername] = useState('');
+  const [location, setLocation] = useState(null);
+  const [plannedTime, setPlannedTime] = useState('');
+  const [userList, setUserList] = useState([]);
+  const [plannedTimeError, setPlannedTimeError] = useState('');
+
+  useEffect(() => {
+    // Generate a random user ID for demonstration
+    const newUserId = Math.random().toString(36).substring(7);
+    setUserId(newUserId);
+    setUsername(`User-${newUserId}`);
+
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      socket.emit('userLogin', { userId: newUserId, username: `User-${newUserId}` });
+    });
+
+    socket.on('userListUpdate', (updatedUserList) => {
+      setUserList(updatedUserList);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  const handleSetLocation = () => {
+    if (location) {
+      socket.emit('setLocation', { userId, location, plannedTime });
+    }
+  };
+
+  const handleMapClick = (event) => {
+    setLocation(event.latlng);
+  };
+
+  const handlePlannedTimeChange = (e) => {
+    const time = e.target.value;
+    setPlannedTime(time);
+
+    // Basic time format validation (HH:MM AM/PM)
+    const timeRegex = /^(1[0-2]|0?[1-9]):([0-5][0-9]) ([AP]M)$/i;
+    if (!timeRegex.test(time)) {
+      setPlannedTimeError('Invalid time format. Use HH:MM AM/PM (e.g., 2:00 PM)');
+    } else {
+      setPlannedTimeError('');
+    }
+  };
+  
+
+  return (
+    <div>
+      <h1>Interactive Map App</h1>
+      <div>
+        <input
+          type="text"
+          placeholder="Planned Time (e.g., 2:00 PM)"
+          value={plannedTime}
+          onChange={handlePlannedTimeChange}
+        />
+        {plannedTimeError && <div style={{ color: 'red' }}>{plannedTimeError}</div>}
+        <button onClick={handleSetLocation} disabled={!location || plannedTimeError}>
+          Set Location
+        </button>
+      </div>
+      <MapContainer
+        center={[40.7128, -74.0060]} // Default to New York City
+        zoom={10}
+        style={{ height: '500px', width: '100%' }}
+        onClick={handleMapClick}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+        />
+        {location && (
+          <Marker position={location}>
+            <Popup>
+              You are here!
+            </Popup>
+          </Marker>
+        )}
+        {userList.map((user) => (
+          user.location && (
+            <Marker key={user.userId} position={user.location}>
+              <Popup>
+                {user.username} - {user.plannedTime}
+              </Popup>
+            </Marker>
+          )
+        ))}
+      </MapContainer>
+    </div>
+  );
+}
+
+export default App;
