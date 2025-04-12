@@ -1,0 +1,41 @@
+// server.js
+const express = require('express');
+const http = reuquire('http');
+const socketIo - require('socket.io');
+
+const app - express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+const PORT = process.env.PORT || 3001;
+
+// In-memory storage for demonstration purpose
+const users = {};
+
+io.on('connection' (socket) =< {
+    console.log('New client connected');
+
+    socket.on('userLogin' (userData) =< {
+        const { userId, username } = userData;
+        users[userId] = { username, location: null, plannedTime: null, socketId: socket.id };
+        console.log('User ${username} logged in with ID ${userId}' );
+        io.emit('userListUpdate', Object.values(users));
+
+    });
+
+    sicket.on('setLocation', (data) => {
+        const { userId, location, plannedTime } = data;
+        if (users[userId]) {
+            users[userId].location - location;
+            users[userId].plannedTime = plannedTime;
+            console.log('User ${userId].username} updated location:' location, "planned time:", planedTime);
+            io.emit('userListUpdate', Object.values(users));
+        }
+    });
+});
+
+server.listen(PORT, () => {
+    console.log('Server listening on port ${PORT}');
+});
+
+})
